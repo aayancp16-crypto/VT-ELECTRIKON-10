@@ -1,0 +1,16 @@
+[
+    {
+        "id": 1,
+        "name": "Multispan Digital Timer",
+        "price": 1200,
+        "stock": 5,
+        "image": "images/multispan_timer.jpg"
+    },
+    {
+        "id": 2,
+        "name": "Sibass Electric Contactor",
+        "price": 850,
+        "stock": 0,
+        "image": "images/sibass_contactor.jpg"
+    }
+]
