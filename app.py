@@ -1,13 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for
+import os
 import sqlite3
+from flask import Flask, render_template, jsonify
 
 app = Flask(__name__)
 
-# ---------------------------
-# Database Initialization
-# ---------------------------
+DB_FILE = "products.db"
+
+# Create database and table
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS products (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,52 +21,45 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ---------------------------
-# Handle HEAD requests globally
-# ---------------------------
-@app.before_request
-def handle_head():
-    if request.method == 'HEAD':
-        return '', 200  # Empty response for HEAD requests
+# Add sample products if table is empty
+def seed_data():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM products")
+    if c.fetchone()[0] == 0:
+        products = [
+            ("Digital Timer", "Multispan", 1200, 5, "multispan_timer.jpg"),
+            ("MCB Switch", "Sibass", 450, 10, "sibass_mcb.jpg")
+        ]
+        c.executemany("INSERT INTO products (name, brand, price, stock, image) VALUES (?, ?, ?, ?, ?)", products)
+        conn.commit()
+    conn.close()
 
-# ---------------------------
-# Home Page
-# ---------------------------
-@app.route('/', methods=['GET', 'HEAD'])
+@app.route('/')
 def home():
-    try:
-        conn = sqlite3.connect('database.db')
-        c = conn.cursor()
-        c.execute("SELECT * FROM products")
-        products = c.fetchall()
-        conn.close()
-    except Exception as e:
-        print("Database error:", e)
-        products = []
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT * FROM products")
+    products = c.fetchall()
+    conn.close()
     return render_template('index.html', products=products)
 
-# ---------------------------
-# Buy Product
-# ---------------------------
-@app.route('/buy/<int:product_id>', methods=['GET', 'HEAD'])
-def buy(product_id):
-    try:
-        conn = sqlite3.connect('database.db')
-        c = conn.cursor()
-        c.execute("SELECT stock FROM products WHERE id=?", (product_id,))
-        stock = c.fetchone()[0]
-        if stock > 0:
-            c.execute("UPDATE products SET stock = stock - 1 WHERE id=?", (product_id,))
-            conn.commit()
-            message = "Order placed successfully!"
-        else:
-            message = "Out of stock!"
+@app.route('/add_to_cart/<int:product_id>', methods=['POST'])
+def add_to_cart(product_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT stock FROM products WHERE id=?", (product_id,))
+    stock = c.fetchone()
+    if stock and stock[0] > 0:
+        c.execute("UPDATE products SET stock = stock - 1 WHERE id=?", (product_id,))
+        conn.commit()
         conn.close()
-    except Exception as e:
-        print("Error processing order:", e)
-        message = "Error placing order."
-    return message
+        return jsonify({"status": "success", "message": "Item added to cart!"})
+    conn.close()
+    return jsonify({"status": "error", "message": "Out of stock!"})
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    seed_data()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
