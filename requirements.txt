@@ -1,4 +1,4 @@
 flask
-gunicorn app:app
+gunicorn
 razorpay
 
